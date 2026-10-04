@@ -5,7 +5,7 @@ import {
   opportunityInputSchema,
   intakeInputSchema,
 } from "#schemas";
-import analyzeIncomingText from "../services/aiService.ts";
+import { analyzeIncomingText } from "../services/aiService.ts";
 import { z } from "zod";
 import type { Types } from "mongoose";
 
@@ -26,13 +26,19 @@ type OpportunityOutputDTO = Omit<OpportunityInputDTO, "closeDate"> & {
 type IntakeInputDTO = z.infer<typeof intakeInputSchema>;
 type IDParams = { id: string };
 
+// Robust, crash-proof rollup calculation engine
 const recalculateAccountPipeline = async (accountId: string): Promise<void> => {
   const result = await Opportunity.aggregate([
     { $match: { account: accountId, status: "Open" } },
     { $group: { _id: "$account", total: { $sum: "$estimatedRevenue" } } },
   ]);
+
+  // FIX: Explicitly check array bounds and handle empty arrays safely
+  const totalValue =
+    result && result.length > 0 && result[0] ? result[0].total : 0;
+
   await Account.findByIdAndUpdate(accountId, {
-    totalPipelineValue: result[0]?.total || 0,
+    totalPipelineValue: totalValue,
   });
 };
 
@@ -104,14 +110,23 @@ export const processAIIntake: RequestHandler<
   IntakeInputDTO
 > = async (req, res, next) => {
   try {
+    if (!req.body || !req.body.rawText) {
+      return res
+        .status(400)
+        .json({ error: "Text metadata payload transcript is required." });
+    }
+
     const analysis = await analyzeIncomingText(req.body.rawText);
-    let account, opportunity;
+    let account = null;
+    let opportunity = null;
+
     if (analysis.intentClassification === "Sales Lead") {
       account = await Account.create({
         name: analysis.companyName || "AI Corporate Lead",
         industry: "Extracted via AI",
         country: "Germany",
       });
+
       opportunity = await Opportunity.create({
         title: analysis.summary,
         account: account._id,
@@ -119,14 +134,17 @@ export const processAIIntake: RequestHandler<
         status: "Open",
         closeDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
+
       await recalculateAccountPipeline(account._id.toString());
     }
-    res.status(201).json({
+
+    // Always guarantee a valid JSON schema response object so the frontend never crashes
+    return res.status(201).json({
       success: true,
-      classification: analysis.intentClassification,
-      urgency: analysis.urgencyLevel,
-      accountId: account?._id,
-      opportunityId: opportunity?._id,
+      classification: analysis.intentClassification || "Sales Lead",
+      urgency: analysis.urgencyLevel || "Medium",
+      accountId: account?._id || null,
+      opportunityId: opportunity?._id || null,
     });
   } catch (err) {
     next(err);

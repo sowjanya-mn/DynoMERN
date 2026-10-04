@@ -29,7 +29,7 @@ export const analyzeIncomingText = async (
   rawText: string,
 ): Promise<ExtractedIntakeData> => {
   const completion = await openai.chat.completions.create({
-    model: "llama3", // <-- Swap this with whatever model you have pulled in Ollama (e.g., 'mistral', 'llama3.1')
+    model: "llama3.1:8b", // <-- Swap this with whatever model you have pulled in Ollama (e.g., 'mistral', 'llama3.1')
     messages: [
       {
         role: "system",

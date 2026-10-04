@@ -6,7 +6,7 @@ import {
   updateOpportunityStatus,
   processAIIntake,
 } from "#controllers";
-//import { validateBody } from "#middlewares";
+import { validateBody } from "#middlewares";
 import {
   accountInputSchema,
   opportunityInputSchema,
@@ -15,15 +15,20 @@ import {
 
 const crmRouter = Router();
 
-crmRouter.route("/accounts").get(getAccounts);
-//.post(validateBody(accountInputSchema), createAccount);
+// Endpoint layout mapping matrices
+crmRouter
+  .route("/accounts")
+  .get(getAccounts)
+  .post(validateBody(accountInputSchema), createAccount);
 
-crmRouter.route("/opportunities");
-//.post(validateBody(opportunityInputSchema), createOpportunity);
+crmRouter
+  .route("/opportunities")
+  .post(validateBody(opportunityInputSchema), createOpportunity);
 
 crmRouter.route("/opportunities/:id/status").patch(updateOpportunityStatus);
 
-crmRouter.route("/ai/intake");
-//.post(validateBody(intakeInputSchema), processAIIntake);
+crmRouter
+  .route("/ai/intake")
+  .post(validateBody(intakeInputSchema), processAIIntake);
 
 export default crmRouter;
